@@ -6,7 +6,7 @@ A small OLED shows the board's status and pops up a notification for every new m
 
 ## Features
 
-- **Self-hosted WiFi** (SoftAP) with optional password, up to 8 devices
+- **Self-hosted WiFi** (SoftAP) with optional password, up to 13 devices
 - **Captive portal**: a wildcard DNS server plus an HTTP redirect opens the chat as soon as a phone joins the network. `http://pocket.local` (mDNS) also works on Windows (tested) and usually on iOS
 - **Real-time chat over WebSocket**: one message is fanned out to every connected client
 - **Usernames** (1-24 characters, duplicates rejected), join/leave notices and a live online list
