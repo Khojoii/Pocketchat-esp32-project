@@ -1,0 +1,19 @@
+# Private credentials (use secrets.h.example as a template)
+secrets.h
+
+# Arduino / build output
+build/
+*.elf
+*.bin
+*.map
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
