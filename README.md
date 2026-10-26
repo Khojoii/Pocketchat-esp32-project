@@ -4,8 +4,6 @@ An offline group chat room that runs entirely on one ESP32-S3 board. The board c
 
 A small OLED shows the board's status and pops up a notification for every new message.
 
-> Code comments are written in Persian (Farsi).
-
 ## Features
 
 - **Self-hosted WiFi** (SoftAP) with optional password, up to 8 devices

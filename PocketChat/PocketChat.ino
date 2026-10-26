@@ -14,9 +14,9 @@ DNSServer dnsServer;
 const int MAX_CLIENTS = WEBSOCKETS_SERVER_CLIENT_MAX;
 String names[MAX_CLIENTS];
 
-// ---------- تنظیمات شبکه ----------
-// رمزها توی فایل secrets.h هستن که وارد git نمی‌شه (نمونه: secrets.h.example).
-// اگه secrets.h نبود، با مقدارهای پیش‌فرض (وای‌فای باز، بدون اتصال به روتر) کامپایل می‌شه.
+// ---------- Network settings ----------
+// Credentials live in secrets.h, which is not tracked by git (template: secrets.h.example).
+// If secrets.h is missing, the sketch builds with defaults (open AP, no home WiFi).
 #if __has_include("secrets.h")
 #include "secrets.h"
 #else
@@ -27,42 +27,42 @@ String names[MAX_CLIENTS];
 #define SECRET_AP_PASS  ""
 #endif
 
-// وای‌فای خونه (STA): برد به روتر وصل می‌شه
-const char* STA_SSID = SECRET_STA_SSID;      // اسم وای‌فای خونه (خالی = غیرفعال)
-const char* STA_PASS = SECRET_STA_PASS;      // رمز وای‌فای خونه
-const unsigned long STA_TIMEOUT = 10000;     // حداکثر مدت انتظار برای اتصال (میلی‌ثانیه)
+// Home WiFi (STA): the board joins your router
+const char* STA_SSID = SECRET_STA_SSID;      // home WiFi name (empty = disabled)
+const char* STA_PASS = SECRET_STA_PASS;      // home WiFi password
+const unsigned long STA_TIMEOUT = 10000;     // max time to wait for the connection (milliseconds)
 
-// شبکه‌ی خود برد (AP)
+// The board's own network (AP)
 const char* AP_SSID = SECRET_AP_SSID;
-const char* AP_PASS = SECRET_AP_PASS;        // خالی = شبکه‌ی باز. رمز بذاری: حداقل 8 کاراکتر
+const char* AP_PASS = SECRET_AP_PASS;        // empty = open network; if set, at least 8 characters
 
-// ---------- نمایشگر ----------
+// ---------- Display ----------
 const int SDA_PIN = 8;
 const int SCL_PIN = 9;
-const int BTN_PIN = 0;                       // دکمه‌ی BOOT روی برد
+const int BTN_PIN = 0;                       // BOOT button on the board
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
 
-const int PAGE_COUNT = 3;                    // وضعیت، آنلاین‌ها، سیستم
-const unsigned long PAGE_TIME = 5000;        // هر صفحه 5 ثانیه
+const int PAGE_COUNT = 3;                    // status, online users, system
+const unsigned long PAGE_TIME = 5000;        // 5 seconds per page
 int currentPage = 0;
 unsigned long pageSince = 0;
 
 int totalMsgs = 0;
-int peakUsers = 0;                           // بیشترین تعداد کاربر همزمان
+int peakUsers = 0;                           // highest number of simultaneous users
 bool displayDirty = true;
 unsigned long lastDisplay = 0;
 
-// ---------- اعلان پیام جدید (پاپ‌آپ) ----------
-const unsigned long NOTIF_TIME = 3000;       // مدت نمایش اعلان (میلی‌ثانیه)
-const int NOTIF_MAX_CHARS = 35;              // حداکثر تعداد حروف پیام در اعلان
+// ---------- New-message notification (pop-up) ----------
+const unsigned long NOTIF_TIME = 3000;       // how long the pop-up stays (milliseconds)
+const int NOTIF_MAX_CHARS = 35;              // max message characters shown in the pop-up
 String notifFrom = "", notifText = "";
 unsigned long notifStart = 0;
 unsigned long notifUntil = 0;
 unsigned long lastNotifDraw = 0;
 
-// ---------- صفحه‌ی شروع (Splash) و پیشرفت بوت ----------
+// ---------- Splash screen and boot progress ----------
 
-// لوگوی متحرک: سه کمان وای‌فای یکی‌یکی ظاهر می‌شن
+// Animated logo: three WiFi arcs appear one by one
 void showSplash() {
   const uint8_t ARC = U8G2_DRAW_UPPER_RIGHT | U8G2_DRAW_UPPER_LEFT;
   for (int step = 0; step <= 3; step++) {
@@ -86,7 +86,7 @@ void showSplash() {
   delay(600);
 }
 
-// صفحه‌ی بوت: اسم برنامه + پیام مرحله + نوار پیشرفت (0 تا 100)
+// Boot screen: app name + step message + progress bar (0 to 100)
 void bootScreen(const char* msg, int percent) {
   oled.clearBuffer();
   oled.setFont(u8g2_font_helvB14_tr);
@@ -101,20 +101,20 @@ void bootScreen(const char* msg, int percent) {
   oled.sendBuffer();
 }
 
-// ---------- نمایشگر: ابزارهای کمکی ----------
+// ---------- Display: helpers ----------
 
-// نمایشگر فقط حروف انگلیسی داره. حروف غیرانگلیسی (مثل فارسی) رو با ? جایگزین می‌کنیم
+// The display font is ASCII only: replace other characters (e.g. Persian) with ?
 String asciiOnly(const String& s) {
   String r;
   for (size_t i = 0; i < s.length(); i++) {
     unsigned char c = s[i];
     if (c >= 32 && c < 127) r += (char)c;
-    else if (c >= 0xC0) r += '?';            // شروع یک حرف چندبایتی
+    else if (c >= 0xC0) r += '?';            // start of a multi-byte character
   }
   return r;
 }
 
-// متن رو در چند خط 21 کاراکتری می‌نویسه
+// Prints text on several lines of 21 characters
 void drawWrapped(const String& s, int y, int lines) {
   for (int i = 0; i < lines; i++) {
     String part = s.substring(i * 21, (i + 1) * 21);
@@ -124,33 +124,33 @@ void drawWrapped(const String& s, int y, int lines) {
   }
 }
 
-// ---------- اعلان پیام جدید ----------
+// ---------- New-message notification ----------
 
 bool notifOn() {
   return (long)(notifUntil - millis()) > 0;
 }
 
-// وقتی پیام جدید میاد صدا زده می‌شه: اعلان رو آماده و فعال می‌کنه
+// Called when a new message arrives: prepares and activates the pop-up
 void noteMessage(const String& from, const String& text) {
   notifFrom = asciiOnly(from).substring(0, 18);
   String t = asciiOnly(text);
-  if ((int)t.length() > NOTIF_MAX_CHARS)     // بلندتر از 35 حرف؟ ببر و ... بذار
+  if ((int)t.length() > NOTIF_MAX_CHARS)     // longer than 35 characters? cut it and append ...
     t = t.substring(0, NOTIF_MAX_CHARS) + "...";
   notifText = t;
   notifStart = millis();
   notifUntil = notifStart + NOTIF_TIME;
-  lastNotifDraw = 0;                         // اولین فریم فوراً کشیده بشه
+  lastNotifDraw = 0;                         // draw the first frame immediately
 }
 
 void drawNotification() {
   unsigned long elapsed = millis() - notifStart;
   oled.clearBuffer();
 
-  // نوار سفید بالا: پاکت نامه + عنوان (متن سیاه روی سفید)
+  // White bar on top: envelope + title (black text on white)
   oled.setDrawColor(1);
   oled.drawBox(0, 0, 128, 14);
   oled.setDrawColor(0);
-  int bounce = (elapsed / 250) % 2;          // پاکت هر 250 میلی‌ثانیه یک پیکسل بالا/پایین می‌ره
+  int bounce = (elapsed / 250) % 2;          // the envelope bounces one pixel up/down every 250 ms
   oled.drawFrame(4, 2 + bounce, 12, 9);
   oled.drawLine(4, 2 + bounce, 10, 7 + bounce);
   oled.drawLine(15, 2 + bounce, 10, 7 + bounce);
@@ -158,15 +158,15 @@ void drawNotification() {
   oled.drawStr(22, 11, "NEW MESSAGE");
   oled.setDrawColor(1);
 
-  // اسم فرستنده (فونت بولد)
+  // Sender name (bold font)
   oled.setFont(u8g2_font_7x13B_tr);
   oled.drawStr(0, 29, notifFrom.c_str());
 
-  // متن پیام (حداکثر 35 حرف + ...)
+  // Message text (max 35 characters + ...)
   oled.setFont(u8g2_font_6x10_tr);
   drawWrapped(notifText, 43, 2);
 
-  // نوار پایین: زمان باقی‌مانده‌ی اعلان
+  // Bottom bar: time left for the pop-up
   int w = 128 - (int)((128UL * elapsed) / NOTIF_TIME);
   if (w < 0) w = 0;
   oled.drawBox(0, 61, w, 3);
@@ -174,7 +174,7 @@ void drawNotification() {
   oled.sendBuffer();
 }
 
-// ---------- نمایشگر: صفحه‌های عادی ----------
+// ---------- Display: regular pages ----------
 
 void updateDisplay() {
   int users = 0;
@@ -185,19 +185,19 @@ void updateDisplay() {
   oled.clearBuffer();
   oled.setFont(u8g2_font_6x10_tr);
 
-  // سرتیتر
+  // Header
   const char* titles[PAGE_COUNT] = {"PocketChat", "Online", "System"};
   oled.setCursor(0, 10);   oled.print(titles[currentPage]);
   oled.setCursor(104, 10); oled.print(currentPage + 1); oled.print("/"); oled.print(PAGE_COUNT);
   oled.drawHLine(0, 13, 128);
 
-  if (currentPage == 0) {                    // وضعیت
+  if (currentPage == 0) {                    // status
     oled.setCursor(0, 26); oled.print("WiFi: "); oled.print(AP_SSID);
     oled.setCursor(0, 38); oled.print("IP: ");   oled.print(WiFi.softAPIP());
     oled.setCursor(0, 50); oled.print("Users: "); oled.print(users);
     oled.setCursor(0, 62); oled.print("Msgs: ");  oled.print(totalMsgs);
 
-  } else if (currentPage == 1) {             // آنلاین‌ها
+  } else if (currentPage == 1) {             // online users
     if (users == 0) {
       oled.setCursor(0, 26); oled.print("nobody online");
     } else {
@@ -210,7 +210,7 @@ void updateDisplay() {
         }
         shown++;
       }
-      if (shown > 4) {                       // جای چهارمی رو به «+N more» بده
+      if (shown > 4) {                       // the fourth line becomes "+N more"
         oled.setDrawColor(0);
         oled.drawBox(0, 52, 128, 12);
         oled.setDrawColor(1);
@@ -219,7 +219,7 @@ void updateDisplay() {
       }
     }
 
-  } else {                                   // سیستم
+  } else {                                   // system
     unsigned long s = millis() / 1000;
     oled.setCursor(0, 26); oled.printf("Up: %02lu:%02lu:%02lu", s / 3600, (s / 60) % 60, s % 60);
     oled.setCursor(0, 38); oled.printf("Free RAM: %u KB", ESP.getFreeHeap() / 1024);
@@ -230,11 +230,11 @@ void updateDisplay() {
   oled.sendBuffer();
 }
 
-// ---------- تاریخچه (ring buffer) ----------
+// ---------- History (ring buffer) ----------
 const int HIST_MAX = 30;
-String hist[HIST_MAX];     // هر خونه یک پیام به‌صورت JSON
-int histHead = 0;          // خونه‌ای که پیام بعدی توش نوشته می‌شه
-int histCount = 0;         // چند پیام ذخیره شده
+String hist[HIST_MAX];     // each slot holds one message as JSON
+int histHead = 0;          // slot where the next message will be written
+int histCount = 0;         // how many messages are stored
 
 void addHistory(const String& msgJson) {
   hist[histHead] = msgJson;
@@ -243,14 +243,14 @@ void addHistory(const String& msgJson) {
 }
 
 void sendHistory(uint8_t num) {
-  int start = (histHead - histCount + HIST_MAX) % HIST_MAX;   // قدیمی‌ترین
+  int start = (histHead - histCount + HIST_MAX) % HIST_MAX;   // oldest message
   for (int i = 0; i < histCount; i++) {
     ws.sendTXT(num, hist[(start + i) % HIST_MAX]);
   }
 }
 
 const char PAGE[] PROGMEM = R"rawliteral(
-<!DOCTYPE html><html><head>
+<!DOCTYPE html><html lang='en'><head>
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>PocketChat</title>
@@ -268,7 +268,7 @@ const char PAGE[] PROGMEM = R"rawliteral(
 
 <div id='login'>
   <h3>PocketChat</h3>
-  <input id='nm' placeholder='esm-e shoma' maxlength='20' autocomplete='off'>
+  <input id='nm' placeholder='Your name' maxlength='20' autocomplete='off'>
   <button onclick='join()'>Join</button>
   <p id='err'></p>
 </div>
@@ -277,13 +277,13 @@ const char PAGE[] PROGMEM = R"rawliteral(
   <h3>PocketChat <small id='st'></small></h3>
   <div id='users'></div>
   <div id='log'></div>
-  <input id='inp' placeholder='payam...' autocomplete='off'>
+  <input id='inp' placeholder='Type a message...' autocomplete='off'>
   <button onclick='send()'>Send</button>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
-let me = '';          // خالی = هنوز وارد نشده؛ پر = وارد شده (برای ورود مجدد)
+let me = '';          // empty = not joined yet; set = joined (used to re-join after a reconnect)
 let ws;
 
 function sendJoin(name) {
@@ -302,7 +302,7 @@ function send() {
 }
 function addLine(text, cls, from) {
   const d = document.createElement('div');
-  d.dir = 'auto';
+  d.dir = 'auto';                      // text direction per line, so Persian/Arabic renders right-to-left
   if (cls) d.className = cls;
   if (from) {
     const b = document.createElement('b');
@@ -319,22 +319,22 @@ function connect() {
 
   ws.onopen = () => {
     $('st').textContent = '(connected)';
-    if (me) sendJoin(me);              // اتصال مجدد: با اسم قبلی وارد شو
+    if (me) sendJoin(me);              // reconnect: join again with the previous name
   };
   ws.onclose = () => {
     $('st').textContent = '(reconnecting...)';
-    setTimeout(connect, 2000);         // ۲ ثانیه بعد دوباره تلاش کن
+    setTimeout(connect, 2000);         // try again in 2 seconds
   };
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.type === 'joined') {
       me = m.name;
-      $('log').innerHTML = '';         // تاریخچه دوباره می‌رسه، تکراری نشه
+      $('log').innerHTML = '';         // the history is sent again, avoid duplicates
       $('login').style.display = 'none';
       $('chat').style.display = 'block';
       $('st').textContent = '(connected)';
     } else if (m.type === 'error') {
-      if (me) setTimeout(() => sendJoin(me), 3000);   // حین اتصال مجدد: دوباره امتحان کن
+      if (me) setTimeout(() => sendJoin(me), 3000);   // while reconnecting: try again
       else $('err').textContent = m.text;
     } else if (m.type === 'msg') {
       addLine(m.text, m.from === me ? 'me' : '', m.from);
@@ -356,9 +356,9 @@ void handleRoot() {
   server.send_P(200, "text/html; charset=utf-8", PAGE);
 }
 
-// هر آدرسی که نمی‌شناسیم → ببر به صفحه‌ی چت
+// Any address we do not know: send the visitor to the chat page
 void handleNotFound() {
-  if (server.client().localIP() != WiFi.softAPIP()) {   // درخواست از شبکه‌ی خونه یا اینترنت: redirect نکن
+  if (server.client().localIP() != WiFi.softAPIP()) {   // request from the home network or the internet: do not redirect
     server.send(404, "text/plain", "Not found");
     return;
   }
@@ -367,7 +367,7 @@ void handleNotFound() {
   server.send(302, "text/plain", "");
 }
 
-// ---------- توابع کمکی ----------
+// ---------- Helpers ----------
 
 bool nameTaken(const String& n) {
   for (int i = 0; i < MAX_CLIENTS; i++)
@@ -404,7 +404,7 @@ void sendError(uint8_t num, const char* text) {
   ws.sendTXT(num, out);
 }
 
-// ---------- پردازش پیام‌ها ----------
+// ---------- Message handling ----------
 
 void handleMessage(uint8_t num, uint8_t* payload, size_t length) {
   JsonDocument doc;
@@ -416,8 +416,8 @@ void handleMessage(uint8_t num, uint8_t* payload, size_t length) {
     String name = doc["name"] | "";
     name.trim();
     if (names[num].length() > 0) return;
-    if (name.length() == 0 || name.length() > 24) { sendError(num, "Esm bayad 1 ta 24 harf bashe"); return; }
-    if (nameTaken(name)) { sendError(num, "In esm gerefte shode"); return; }
+    if (name.length() == 0 || name.length() > 24) { sendError(num, "Name must be 1 to 24 characters"); return; }
+    if (nameTaken(name)) { sendError(num, "That name is already taken"); return; }
 
     names[num] = name;
     JsonDocument ok;
@@ -427,7 +427,7 @@ void handleMessage(uint8_t num, uint8_t* payload, size_t length) {
     serializeJson(ok, out);
     ws.sendTXT(num, out);
 
-    sendHistory(num);              // پیام‌های قبلی رو فقط برای همین نفر بفرست
+    sendHistory(num);              // send earlier messages to this client only
     sendSys(name + " joined");
     sendUsers();
     displayDirty = true;
@@ -443,10 +443,10 @@ void handleMessage(uint8_t num, uint8_t* payload, size_t length) {
     m["text"] = text;
     String out;
     serializeJson(m, out);
-    addHistory(out);               // در تاریخچه ذخیره کن
+    addHistory(out);               // store in the history
     ws.broadcastTXT(out);
     totalMsgs++;
-    noteMessage(names[num], text); // اعلان پیام جدید روی نمایشگر
+    noteMessage(names[num], text); // show the new-message pop-up on the display
     displayDirty = true;
   }
 }
@@ -477,25 +477,25 @@ void onWsEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
 void setup() {
   Serial.begin(115200);
 
-  // نمایشگر و دکمه
+  // Display and button
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setClock(400000);        // I2C سریع‌تر (400kHz)
+  Wire.setClock(400000);        // faster I2C (400 kHz)
   oled.begin();
   pinMode(BTN_PIN, INPUT_PULLUP);
 
-  showSplash();                 // لوگوی شروع (حدود 2 ثانیه؛ زمان کافی برای باز شدن Serial Monitor)
+  showSplash();                 // splash logo (about 2 s; also gives the Serial Monitor time to open)
 
-  // مرحله 1: وای‌فای
+  // Step 1: WiFi
   bootScreen("Starting WiFi...", 10);
   int apChannel = 1;
-  WiFi.mode(WIFI_AP_STA);                    // هم Access Point، هم متصل به روتر
+  WiFi.mode(WIFI_AP_STA);                    // both Access Point and router client
   if (strlen(STA_SSID) > 0) {
     bootScreen("Joining home WiFi...", 15);
     WiFi.begin(STA_SSID, STA_PASS);
     unsigned long t0 = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - t0 < STA_TIMEOUT) delay(200);
     if (WiFi.status() == WL_CONNECTED) {
-      apChannel = WiFi.channel();            // AP باید روی همون کانال روتر باشه (یک آنتن بیشتر نداریم)
+      apChannel = WiFi.channel();            // the AP must use the router's channel (the radio has only one)
       Serial.print("Home WiFi IP: ");
       Serial.println(WiFi.localIP());
     } else {
@@ -508,31 +508,31 @@ void setup() {
   Serial.println(WiFi.softAPIP());
   delay(300);
 
-  // مرحله 2: DNS (Captive Portal)
+  // Step 2: DNS (captive portal)
   bootScreen("Starting DNS...", 35);
-  dnsServer.start(53, "*", WiFi.softAPIP());         // هر اسمی → آدرس خود برد
+  dnsServer.start(53, "*", WiFi.softAPIP());         // every name resolves to the board's own address
   delay(300);
 
-  // مرحله 3: mDNS
+  // Step 3: mDNS
   bootScreen("Starting mDNS...", 55);
-  if (MDNS.begin("pocket")) {                        // آدرس pocket.local
+  if (MDNS.begin("pocket")) {                        // address pocket.local
     MDNS.addService("http", "tcp", 80);
     Serial.println("mDNS: http://pocket.local");
   }
   delay(300);
 
-  // مرحله 4: وب‌سرور
+  // Step 4: web server
   bootScreen("Starting server...", 75);
   server.on("/", handleRoot);
-  server.onNotFound(handleNotFound);                 // آدرس‌های ناشناخته → redirect
+  server.onNotFound(handleNotFound);                 // unknown addresses -> redirect
   server.begin();
   delay(300);
 
-  // مرحله 5: چت (WebSocket)
+  // Step 5: chat (WebSocket)
   bootScreen("Starting chat...", 90);
   ws.begin();
   ws.onEvent(onWsEvent);
-  ws.enableHeartbeat(10000, 3000, 2);   // هر 10 ثانیه ping؛ 3 ثانیه مهلت pong؛ بعد از 2 بار نیومدن، قطع
+  ws.enableHeartbeat(10000, 3000, 2);   // ping every 10 s; 3 s to answer; disconnect after 2 misses
   delay(300);
 
   bootScreen("Ready!", 100);
@@ -540,26 +540,26 @@ void setup() {
   delay(800);
 
   pageSince = millis();
-  updateDisplay();              // صفحه‌ی اول
+  updateDisplay();              // first page
 }
 
 unsigned long lastPrint = 0;
 
 void loop() {
-  dnsServer.processNextRequest();    // به سؤال‌های DNS جواب بده
+  dnsServer.processNextRequest();    // answer DNS queries
   server.handleClient();
   ws.loop();
 
-  // --- دکمه‌ی BOOT: اگه اعلان بازه می‌بندتش، وگرنه صفحه‌ی بعدی ---
+  // --- BOOT button: closes the pop-up if one is shown, otherwise next page ---
   static bool lastBtn = HIGH;
   static unsigned long lastPress = 0;
   bool btn = digitalRead(BTN_PIN);
-  if (lastBtn == HIGH && btn == LOW && millis() - lastPress > 200) {   // لحظه‌ی فشرده شدن
+  if (lastBtn == HIGH && btn == LOW && millis() - lastPress > 200) {   // the moment it is pressed
     lastPress = millis();
-    if (notifOn()) notifUntil = 0;                         // بستن اعلان
-    else currentPage = (currentPage + 1) % PAGE_COUNT;     // صفحه‌ی بعدی
+    if (notifOn()) notifUntil = 0;                         // close the pop-up
+    else currentPage = (currentPage + 1) % PAGE_COUNT;     // next page
     pageSince = millis();
-    updateDisplay();                                       // فوراً نشون بده
+    updateDisplay();                                       // show it immediately
     lastDisplay = millis();
     displayDirty = false;
   }
@@ -568,31 +568,31 @@ void loop() {
   static bool wasNotif = false;
 
   if (notifOn()) {
-    // --- اعلان فعاله: هر 100 میلی‌ثانیه دوباره بکش (برای انیمیشن و نوار زمان) ---
+    // --- Pop-up active: redraw every 100 ms (animation and countdown bar) ---
     wasNotif = true;
-    pageSince = millis();                                  // چرخش صفحه‌ها تا پایان اعلان صبر می‌کنه
+    pageSince = millis();                                  // page rotation waits until the pop-up ends
     if (millis() - lastNotifDraw > 100) {
       lastNotifDraw = millis();
       drawNotification();
     }
 
   } else {
-    // اعلان تموم شد: صفحه‌ی عادی رو برگردون
+    // Pop-up finished: bring the regular page back
     if (wasNotif) {
       wasNotif = false;
       displayDirty = true;
       lastDisplay = 0;
     }
 
-    // --- چرخش خودکار صفحه‌ها ---
+    // --- Automatic page rotation ---
     if (millis() - pageSince > PAGE_TIME) {
       currentPage = (currentPage + 1) % PAGE_COUNT;
       pageSince = millis();
       displayDirty = true;
     }
 
-    // --- تازه‌کردن نمایشگر: حداکثر ثانیه‌ای یک بار ---
-    // (صفحه‌ی سیستم، یعنی شماره 2، همیشه تازه می‌شه چون زمان کار داره می‌گذره)
+    // --- Refresh the display: at most once a second ---
+    // (the System page, index 2, always refreshes because the uptime keeps changing)
     if ((displayDirty || currentPage == 2) && millis() - lastDisplay > 1000) {
       lastDisplay = millis();
       displayDirty = false;
@@ -600,7 +600,7 @@ void loop() {
     }
   }
 
-  if (millis() - lastPrint > 10000) {   // هر 10 ثانیه وضعیت رو چاپ کن
+  if (millis() - lastPrint > 10000) {   // print the status every 10 seconds
     lastPrint = millis();
     Serial.printf("WiFi clients: %d | free heap: %u | history: %d\n",
                   WiFi.softAPgetStationNum(), ESP.getFreeHeap(), histCount);
