@@ -4,6 +4,9 @@ An offline group chat room that runs entirely on one ESP32-S3 board. The board c
 
 A small OLED shows the board's status and pops up a notification for every new message.
 
+![PocketChat - If you learned something, Star this repo](./Banner/banner.png)
+
+
 ## Features
 
 - **Self-hosted WiFi** (SoftAP) with optional password, up to 8 devices
